@@ -30,24 +30,9 @@ def ensure_model_present():
             st.success("✅ Model downloaded successfully!")
             return True
     except Exception as e:
-        st.warning(f"gdown failed: {e}. Trying alternative...")
+        st.warning(f"Download attempt failed: {e}")
 
-    # Fallback using requests
-    try:
-        import requests
-        r = requests.get(MODEL_URL, stream=True, timeout=300)
-        if r.status_code == 200:
-            with open(path, "wb") as f:
-                for chunk in r.iter_content(chunk_size=32768):
-                    if chunk:
-                        f.write(chunk)
-            if path.exists() and path.stat().st_size > 100_000:
-                st.success("✅ Model downloaded via fallback method!")
-                return True
-    except Exception as e:
-        st.error(f"Download failed: {e}")
-
-    st.error("❌ Could not download the model. Please check Google Drive sharing settings (Anyone with the link).")
+    st.error("❌ Could not download the model. Please check Google Drive sharing settings.")
     st.stop()
     return False
 
@@ -59,13 +44,38 @@ def load_model():
 
 bundle = load_model()
 le = bundle['label_encoder']
+preproc = bundle['preprocessor']
 
-# ================== PREDICTION FUNCTION ==================
-def predict_severity(input_df):
-    preproc = bundle['preprocessor']
+# ================== PREDICTION FUNCTION (with safe defaults) ==================
+def predict_severity(input_dict):
+    # Create DataFrame with all expected columns + safe defaults for missing ones
+    default_row = {
+        'Day_of_Week': 'Monday',
+        'Junction_Control': 'Give way or uncontrolled',
+        'Junction_Detail': 'Not at junction or within 20 metres',
+        'Light_Conditions': 'Daylight',
+        'Carriageway_Hazards': 'None',
+        'Road_Surface_Conditions': 'Dry',
+        'Road_Type': 'Single carriageway',
+        'Urban_or_Rural_Area': 'Urban',
+        'Weather_Conditions': 'Fine no high winds',
+        'Vehicle_Type': 'Car',
+        'Number_of_Vehicles': 2,
+        'Number_of_Casualties': 1,
+        'Speed_limit': 30,
+        'High_Speed': 0,
+    }
+    
+    # Update with user input
+    default_row.update(input_dict)
+    
+    input_df = pd.DataFrame([default_row])
+    
+    # Transform
     X = preproc.transform(input_df)
     X_dense = X.toarray() if hasattr(X, 'toarray') else X
 
+    # Cascade stages
     proba1 = bundle['stage1'].predict_proba(X_dense)
     X2 = np.hstack([X_dense, proba1])
 
@@ -80,7 +90,7 @@ def predict_severity(input_df):
     probs = dict(zip(le.classes_, proba3[0].round(4)))
     return severity, probs
 
-# ================== INPUT FORM ==================
+# ================== INPUT FORM (expanded) ==================
 with st.form("input_form"):
     col1, col2 = st.columns(2)
     with col1:
@@ -88,6 +98,9 @@ with st.form("input_form"):
         junction_control = st.selectbox("Junction Control", 
             ["Give way or uncontrolled", "Auto traffic signal", "Stop sign", 
              "Authorised person", "Not at junction or within 20 metres"])
+        junction_detail = st.selectbox("Junction Detail", 
+            ["Not at junction or within 20 metres", "T or staggered junction", "Crossroads", 
+             "Roundabout", "Slip road", "Other junction"])
         light = st.selectbox("Light Conditions", 
             ["Daylight", "Darkness - lights lit", "Darkness - lights unlit", 
              "Darkness - no lighting", "Dusk or dawn"])
@@ -98,7 +111,11 @@ with st.form("input_form"):
     with col2:
         road_type = st.selectbox("Road Type", 
             ["Single carriageway", "Dual carriageway", "One way street", "Roundabout", "Slip road"])
+        road_surface = st.selectbox("Road Surface Conditions", 
+            ["Dry", "Wet or damp", "Frost or ice", "Snow", "Flood over 3cm deep"])
         urban_rural = st.selectbox("Urban or Rural", ["Urban", "Rural"])
+        vehicle_type = st.selectbox("Vehicle Type", 
+            ["Car", "Taxi/Private hire car", "Motorcycle over 500cc", "Bus or coach", "Van / Goods vehicle", "Other"])
         speed = st.slider("Speed Limit (mph)", 20, 70, 30, step=10)
         num_vehicles = st.number_input("Number of Vehicles", 1, 20, 2)
         num_casualties = st.number_input("Number of Casualties", 1, 20, 1)
@@ -109,18 +126,21 @@ if submitted:
     input_data = {
         'Day_of_Week': day,
         'Junction_Control': junction_control,
+        'Junction_Detail': junction_detail,
         'Light_Conditions': light,
         'Weather_Conditions': weather,
         'Road_Type': road_type,
+        'Road_Surface_Conditions': road_surface,
         'Urban_or_Rural_Area': urban_rural,
+        'Vehicle_Type': vehicle_type,
         'Speed_limit': speed,
         'Number_of_Vehicles': num_vehicles,
         'Number_of_Casualties': num_casualties,
         'High_Speed': 1 if speed >= 60 else 0,
+        'Carriageway_Hazards': 'None',   # default
     }
-    input_df = pd.DataFrame([input_data])
     
-    severity, probs = predict_severity(input_df)
+    severity, probs = predict_severity(input_data)
     
     if severity == "Fatal":
         st.error(f"**Predicted Severity: {severity}**")
