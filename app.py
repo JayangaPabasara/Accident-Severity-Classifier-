@@ -10,6 +10,7 @@ st.set_page_config(page_title="Accident Severity Predictor", page_icon="🚦", l
 st.title("🚦 Road Accident Severity Classifier")
 st.markdown("**Best Model:** Cascade Random Forest (3-stage + Tuned)")
 
+# ================== YOUR FILE ID ==================
 FILE_ID = "1ivkwAA26cU4TeDsHg9TKOB3l8vGUhmCZ"
 MODEL_URL = f"https://drive.google.com/uc?id={FILE_ID}"
 MODEL_PATH = "artifacts/cascade_rf_model.pkl"
@@ -29,9 +30,24 @@ def ensure_model_present():
             st.success("✅ Model downloaded successfully!")
             return True
     except Exception as e:
-        st.warning(f"Download attempt failed: {e}")
+        st.warning(f"gdown failed: {e}. Trying alternative...")
 
-    st.error("❌ Could not download the model. Please check Google Drive sharing settings.")
+    # Fallback using requests
+    try:
+        import requests
+        r = requests.get(MODEL_URL, stream=True, timeout=300)
+        if r.status_code == 200:
+            with open(path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=32768):
+                    if chunk:
+                        f.write(chunk)
+            if path.exists() and path.stat().st_size > 100_000:
+                st.success("✅ Model downloaded via fallback method!")
+                return True
+    except Exception as e:
+        st.error(f"Download failed: {e}")
+
+    st.error("❌ Could not download the model. Please check Google Drive sharing settings (Anyone with the link).")
     st.stop()
     return False
 

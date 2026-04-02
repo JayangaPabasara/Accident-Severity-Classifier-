@@ -3,5 +3,5 @@ pandas
 numpy
 joblib
 gdown
-scikit-learn==1.3.2     
+scikit-learn==1.5.2        # Updated to a version that works with Python 3.14
 imbalanced-learn
