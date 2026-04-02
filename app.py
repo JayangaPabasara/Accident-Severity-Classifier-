@@ -9,17 +9,27 @@ st.set_page_config(page_title="Accident Severity Predictor", page_icon="🚦", l
 st.title("🚦 Road Accident Severity Classifier")
 st.markdown("**Best Model:** Cascade Random Forest (3-stage + Tuned)")
 
+# ================== YOUR FILE ID ==================
 FILE_ID = "1ivkwAA26cU4TeDsHg9TKOB3l8vGUhmCZ"
-
 MODEL_URL = f"https://drive.google.com/uc?id={FILE_ID}"
 MODEL_PATH = "artifacts/cascade_rf_model.pkl"
 
 @st.cache_resource
 def load_model():
-    if not os.path.exists(MODEL_PATH):
-        os.makedirs("artifacts", exist_ok=True)
-        st.info("📥 Downloading model from Google Drive... (first time only, may take 30-60 seconds)")
-        gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
+    if os.path.exists(MODEL_PATH):
+        st.success("✅ Model loaded from cache")
+        return joblib.load(MODEL_PATH)
+
+    os.makedirs("artifacts", exist_ok=True)
+    st.info("📥 Downloading large model from Google Drive... (703 MB - this may take 1-2 minutes)")
+
+    try:
+        gdown.download(MODEL_URL, MODEL_PATH, quiet=False, fuzzy=True)
+        st.success("✅ Model downloaded successfully!")
+    except Exception as e:
+        st.error(f"❌ Download failed: {str(e)}")
+        st.stop()
+
     return joblib.load(MODEL_PATH)
 
 bundle = load_model()
