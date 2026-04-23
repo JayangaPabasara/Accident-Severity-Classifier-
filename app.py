@@ -1,3 +1,5 @@
+# app.py - Streamlit app for Accident Severity Prediction using Cascade Random Forest
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -25,7 +27,7 @@ def ensure_model_present():
     st.info("📥 Downloading large model (~703 MB) from Google Drive... This may take 1-2 minutes.")
 
     try:
-        gdown.download(MODEL_URL, str(path), quiet=False, fuzzy=True)
+        gdown.download(MODEL_URL, str(path), quiet=False)
         if path.exists() and path.stat().st_size > 100_000:
             st.success("✅ Model downloaded successfully!")
             return True
