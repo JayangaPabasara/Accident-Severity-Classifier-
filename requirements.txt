@@ -1,7 +1,7 @@
-streamlit
-pandas
-numpy
-joblib
-gdown
-scikit-learn==1.5.2        # Updated to a version that works with Python 3.14
-imbalanced-learn
+streamlit==1.39.0
+pandas==2.2.3
+numpy==1.26.4
+joblib==1.4.2
+gdown==5.4.0
+scikit-learn==1.5.2
+imbalanced-learn==0.12.3
